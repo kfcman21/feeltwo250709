@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="ko" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI·AIDT 활용 초등 교수·학습 방안 - 실시간 투표</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
+    
+    <style type="text/tailwindcss">
+        @layer base {
+            html {
+                font-family: 'Pretendard', sans-serif;
+                color: #1e3a8a;
+            }
+            .nav-link.active {
+                @apply text-teal-500 font-bold;
+            }
+            .tab-button.active {
+                @apply bg-teal-500 text-white;
+            }
+            .vote-button.voted .heart-outline {
+                display: none;
+            }
+            .vote-button.voted .heart-solid {
+                display: inline-block;
+            }
+            .vote-button .heart-solid {
+                display: none;
+            }
+            .admin-panel {
+                @apply fixed bottom-4 right-4 bg-white rounded-lg shadow-lg p-4 border border-gray-200;
+            }
+            .connection-status {
+                @apply fixed top-4 right-4 px-3 py-1 rounded-full text-xs font-bold;
+            }
+            .connection-status.connected {
+                @apply bg-green-100 text-green-800;
+            }
+            .connection-status.disconnected {
+                @apply bg-red-100 text-red-800;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+
+    <!-- 연결 상태 표시 -->
+    <div id="connectionStatus" class="connection-status disconnected">
+        🔴 연결 중...
+    </div>
+
+    <!-- 관리자 패널 -->
+    <div id="adminPanel" class="admin-panel hidden">
+        <h3 class="font-bold text-sm mb-2">관리자 패널</h3>
+        <div class="flex gap-2">
+            <input type="password" id="adminPassword" placeholder="비밀번호" 
+                   class="text-xs px-2 py-1 border rounded">
+            <button id="resetVotesBtn" class="text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">
+                투표 초기화
+            </button>
+        </div>
+        <div id="adminMessage" class="text-xs mt-1"></div>
+    </div>
+
+    <nav id="navbar" class="bg-white/90 backdrop-blur-sm sticky top-0 z-50 shadow-md">
+        <div class="container mx-auto px-6 py-3">
+            <div class="flex justify-between items-center">
+                <a href="#" class="flex items-center space-x-2">
+                    <span class="text-2xl">📚</span>
+                    <span class="text-xl font-bold text-teal-600">교수·학습 아이디어</span>
+                </a>
+                <div class="hidden md:flex items-center space-x-6 text-sm lg:text-base font-semibold text-slate-600">
+                    <a href="#ideas" class="nav-link hover:text-teal-500 transition-colors">💡 아이디어 보드</a>
+                </div>
+                <button id="mobile-menu-button" class="md:hidden p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500">
+                    <svg class="w-6 h-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+                </button>
+            </div>
+        </div>
+        <div id="mobile-menu" class="hidden md:hidden bg-white border-t border-gray-200">
+            <a href="#ideas" class="block py-3 px-6 text-base font-semibold text-slate-600 hover:bg-teal-50">💡 아이디어 보드</a>
+        </div>
+    </nav>
+
+    <main class="container mx-auto px-6 py-12 md:py-20">
+
+        <header class="text-center mb-12 md:mb-16">
+            <h1 class="text-4xl md:text-5xl font-extrabold mb-4 bg-gradient-to-r from-teal-500 to-sky-500 bg-clip-text text-transparent">AI 도구 및 AIDT 활용 교수·학습 방안</h1>
+            <p class="text-lg md:text-xl text-slate-600 max-w-3xl mx-auto">초등학교 영어 및 수학 교과 중심 아이디어 보드 - 실시간 투표</p>
+        </header>
+
+        <section id="ideas" class="scroll-mt-24">
+            <div class="flex justify-center mb-8">
+                <div class="flex space-x-2 bg-slate-200 p-1.5 rounded-full">
+                    <button data-tab="english" class="tab-button active w-32 text-center px-4 py-2 text-base font-bold text-slate-600 rounded-full transition-colors duration-300">
+                        📚 초등 영어
+                    </button>
+                    <button data-tab="math" class="tab-button w-32 text-center px-4 py-2 text-base font-bold text-slate-600 rounded-full transition-colors duration-300">
+                        🧮 초등 수학
+                    </button>
+                </div>
+            </div>
+
+            <div id="tab-content">
+                <div id="english-panel" class="tab-panel">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+                        <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col gap-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative">
+                            <button class="vote-button absolute top-4 right-4 flex items-center gap-1.5 text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full bg-slate-100/80" data-subject="english" data-card-id="1">
+                                <span class="heart-outline text-lg">♡</span>
+                                <span class="heart-solid text-red-500 text-lg">♥</span>
+                                <span class="vote-count font-bold text-sm">0</span>
+                            </button>
+                            <h3 class="font-bold text-lg text-navy-800 pr-12"><span class="text-teal-500">1.</span> 발음 및 유창성 진단 및 피드백</h3>
+                            <div class="bg-slate-100 p-3 rounded-lg text-sm"><strong class="text-sky-700">[AIDT]</strong> Analyze, Track, Evaluate: AI 음성 분석으로 즉각적인 피드백 제공.</div>
+                            <div class="text-sm font-semibold text-slate-600 mt-auto pt-2 border-t border-slate-200">🎯 맞춤 학습, 교사 전문성 강화</div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col gap-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative">
+                            <button class="vote-button absolute top-4 right-4 flex items-center gap-1.5 text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full bg-slate-100/80" data-subject="english" data-card-id="2">
+                                <span class="heart-outline text-lg">♡</span>
+                                <span class="heart-solid text-red-500 text-lg">♥</span>
+                                <span class="vote-count font-bold text-sm">0</span>
+                            </button>
+                            <h3 class="font-bold text-lg text-navy-800 pr-12"><span class="text-teal-500">2.</span> 개인별 어휘/문법 진단 및 맞춤 경로 설계</h3>
+                            <div class="bg-slate-100 p-3 rounded-lg text-sm"><strong class="text-sky-700">[AIDT]</strong> Analyze, Design: AI 진단평가로 최적화된 학습 경로 추천.</div>
+                            <div class="text-sm font-semibold text-slate-600 mt-auto pt-2 border-t border-slate-200">🎯 인간 존엄성, 맞춤 학습</div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col gap-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative">
+                            <button class="vote-button absolute top-4 right-4 flex items-center gap-1.5 text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full bg-slate-100/80" data-subject="english" data-card-id="3">
+                                <span class="heart-outline text-lg">♡</span>
+                                <span class="heart-solid text-red-500 text-lg">♥</span>
+                                <span class="vote-count font-bold text-sm">0</span>
+                            </button>
+                            <h3 class="font-bold text-lg text-navy-800 pr-12"><span class="text-teal-500">3.</span> 수준별 영어 독서 자료 큐레이션</h3>
+                            <div class="bg-slate-100 p-3 rounded-lg text-sm"><strong class="text-sky-700">[AIDT]</strong> Design: 학생의 읽기 수준, 흥미를 고려한 AI 도서 추천.</div>
+                            <div class="text-sm font-semibold text-slate-600 mt-auto pt-2 border-t border-slate-200">🎯 맞춤 학습, 교사 전문성 강화</div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col gap-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative">
+                            <button class="vote-button absolute top-4 right-4 flex items-center gap-1.5 text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full bg-slate-100/80" data-subject="english" data-card-id="4">
+                                <span class="heart-outline text-lg">♡</span>
+                                <span class="heart-solid text-red-500 text-lg">♥</span>
+                                <span class="vote-count font-bold text-sm">0</span>
+                            </button>
+                            <h3 class="font-bold text-lg text-navy-800 pr-12"><span class="text-teal-500">4.</span> AI 챗봇 기반 영어 회화 연습</h3>
+                            <div class="bg-slate-100 p-3 rounded-lg text-sm"><strong class="text-sky-700">[AIDT]</strong> Implement: AI 챗봇과 대화하며 실시간 문법/표현 피드백.</div>
+                            <div class="text-sm font-semibold text-slate-600 mt-auto pt-2 border-t border-slate-200">🎯 학생 참여 증진, 맞춤 학습</div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col gap-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative">
+                            <button class="vote-button absolute top-4 right-4 flex items-center gap-1.5 text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full bg-slate-100/80" data-subject="english" data-card-id="5">
+                                <span class="heart-outline text-lg">♡</span>
+                                <span class="heart-solid text-red-500 text-lg">♥</span>
+                                <span class="vote-count font-bold text-sm">0</span>
+                            </button>
+                            <h3 class="font-bold text-lg text-navy-800 pr-12"><span class="text-teal-500">5.</span> 적응형 듣기 평가 및 활동</h3>
+                            <div class="bg-slate-100 p-3 rounded-lg text-sm"><strong class="text-sky-700">[AIDT]</strong> Implement: 학생 이해도에 따라 AI가 콘텐츠 난이도 실시간 조절.</div>
+                            <div class="text-sm font-semibold text-slate-600 mt-auto pt-2 border-t border-slate-200">🎯 맞춤 학습, 수업 효율성 증대</div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col gap-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative">
+                            <button class="vote-button absolute top-4 right-4 flex items-center gap-1.5 text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full bg-slate-100/80" data-subject="english" data-card-id="6">
+                                <span class="heart-outline text-lg">♡</span>
+                                <span class="heart-solid text-red-500 text-lg">♥</span>
+                                <span class="vote-count font-bold text-sm">0</span>
+                            </button>
+                            <h3 class="font-bold text-lg text-navy-800 pr-12"><span class="text-teal-500">6.</span> AI 자동 영작 피드백</h3>
+                            <div class="bg-slate-100 p-3 rounded-lg text-sm"><strong class="text-sky-700">[AIDT]</strong> Implement, Evaluate: AI가 문법, 철자 등 즉각적 교정 및 표현 제안.</div>
+                            <div class="text-sm font-semibold text-slate-600 mt-auto pt-2 border-t border-slate-200">🎯 피드백 효율성, 맞춤 학습</div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col gap-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative">
+                            <button class="vote-button absolute top-4 right-4 flex items-center gap-1.5 text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full bg-slate-100/80" data-subject="english" data-card-id="7">
+                                <span class="heart-outline text-lg">♡</span>
+                                <span class="heart-solid text-red-500 text-lg">♥</span>
+                                <span class="vote-count font-bold text-sm">0</span>
+                            </button>
+                            <h3 class="font-bold text-lg text-navy-800 pr-12"><span class="text-teal-500">7.</span> 실시간 수업 참여 유도 및 상호작용</h3>
+                            <div class="bg-slate-100 p-3 rounded-lg text-sm"><strong class="text-sky-700">[AIDT]</strong> Implement: AI 인터랙티브 요소로 학생 반응에 따른 자료 실시간 제공.</div>
+                            <div class="text-sm font-semibold text-slate-600 mt-auto pt-2 border-t border-slate-200">🎯 학생 참여 증진, 하이터치/하이테크 조화</div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col gap-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative">
+                            <button class="vote-button absolute top-4 right-4 flex items-center gap-1.5 text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full bg-slate-100/80" data-subject="english" data-card-id="8">
+                                <span class="heart-outline text-lg">♡</span>
+                                <span class="heart-solid text-red-500 text-lg">♥</span>
+                                <span class="vote-count font-bold text-sm">0</span>
+                            </button>
+                            <h3 class="font-bold text-lg text-navy-800 pr-12"><span class="text-teal-500">8.</span> 영어 학습 이력 및 성장 추적 대시보드</h3>
+                            <div class="bg-slate-100 p-3 rounded-lg text-sm"><strong class="text-sky-700">[AIDT]</strong> Track, Evaluate: AI가 학습 데이터 분석 후 시각화 대시보드 제공.</div>
+                            <div class="text-sm font-semibold text-slate-600 mt-auto pt-2 border-t border-slate-200">🎯 맞춤 학습, 교사 전문성 강화</div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col gap-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative">
+                            <button class="vote-button absolute top-4 right-4 flex items-center gap-1.5 text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full bg-slate-100/80" data-subject="english" data-card-id="9">
+                                <span class="heart-outline text-lg">♡</span>
+                                <span class="heart-solid text-red-500 text-lg">♥</span>
+                                <span class="vote-count font-bold text-sm">0</span>
+                            </button>
+                            <h3 class="font-bold text-lg text-navy-800 pr-12"><span class="text-teal-500">9.</span> AI 기반 프로젝트 학습 제안</h3>
+                            <div class="bg-slate-100 p-3 rounded-lg text-sm"><strong class="text-sky-700">[AIDT]</strong> Design, Implement: 학생 흥미/역량 기반 영어 주제탐구 프로젝트 제안.</div>
+                            <div class="text-sm font-semibold text-slate-600 mt-auto pt-2 border-t border-slate-200">🎯 인간 존엄성, 맞춤 학습</div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col gap-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative">
+                            <button class="vote-button absolute top-4 right-4 flex items-center gap-1.5 text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full bg-slate-100/80" data-subject="english" data-card-id="10">
+                                <span class="heart-outline text-lg">♡</span>
+                                <span class="heart-solid text-red-500 text-lg">♥</span>
+                                <span class="vote-count font-bold text-sm">0</span>
+                            </button>
+                            <h3 class="font-bold text-lg text-navy-800 pr-12"><span class="text-teal-500">10.</span> 온라인 자율 학습 시스템</h3>
+                            <div class="bg-slate-100 p-3 rounded-lg text-sm"><strong class="text-sky-700">[AIDT]</strong> Implement: AI 플랫폼을 통해 시공간 제약 없는 유연한 학습 환경 제공.</div>
+                            <div class="text-sm font-semibold text-slate-600 mt-auto pt-2 border-t border-slate-200">🎯 맞춤 학습, 자기 주도 학습 능력 향상</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="math-panel" class="tab-panel hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+                        <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col gap-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative">
+                            <button class="vote-button absolute top-4 right-4 flex items-center gap-1.5 text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full bg-slate-100/80" data-subject="math" data-card-id="1">
+                                <span class="heart-outline text-lg">♡</span>
+                                <span class="heart-solid text-red-500 text-lg">♥</span>
+                                <span class="vote-count font-bold text-sm">0</span>
+                            </button>
+                            <h3 class="font-bold text-lg text-navy-800 pr-12"><span class="text-orange-500">1.</span> 수학 개념 이해도 진단 및 취약점 분석</h3>
+                            <div class="bg-slate-100 p-3 rounded-lg text-sm"><strong class="text-sky-700">[AIDT]</strong> Analyze: AI가 오답 유형을 분석하여 학생별 강·약점 도출.</div>
+                            <div class="text-sm font-semibold text-slate-600 mt-auto pt-2 border-t border-slate-200">🎯 맞춤 학습, 교사 전문성 강화</div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col gap-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative">
+                            <button class="vote-button absolute top-4 right-4 flex items-center gap-1.5 text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full bg-slate-100/80" data-subject="math" data-card-id="2">
+                                <span class="heart-outline text-lg">♡</span>
+                                <span class="heart-solid text-red-500 text-lg">♥</span>
+                                <span class="vote-count font-bold text-sm">0</span>
+                            </button>
+                            <h3 class="font-bold text-lg text-navy-800 pr-12"><span class="text-orange-500">2.</span> 개인별 맞춤 문제 풀이 추천 및 생성</h3>
+                            <div class="bg-slate-100 p-3 rounded-lg text-sm"><strong class="text-sky-700">[AIDT]</strong> Design: 진단 결과 기반 AI 맞춤형 문제 세트 추천/생성.</div>
+                            <div class="text-sm font-semibold text-slate-600 mt-auto pt-2 border-t border-slate-200">🎯 맞춤 학습, 개별화 교육</div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col gap-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative">
+                            <button class="vote-button absolute top-4 right-4 flex items-center gap-1.5 text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full bg-slate-100/80" data-subject="math" data-card-id="3">
+                                <span class="heart-outline text-lg">♡</span>
+                                <span class="heart-solid text-red-500 text-lg">♥</span>
+                                <span class="vote-count font-bold text-sm">0</span>
+                            </button>
+                            <h3 class="font-bold text-lg text-navy-800 pr-12"><span class="text-orange-500">3.</span> AI 기반 오답 유형 분석 및 개별 피드백</h3>
+                            <div class="bg-slate-100 p-3 rounded-lg text-sm"><strong class="text-sky-700">[AIDT]</strong> Analyze, Evaluate: 오답 데이터 분석 후 맞춤형 피드백/보충 경로 추천.</div>
+                            <div class="text-sm font-semibold text-slate-600 mt-auto pt-2 border-t border-slate-200">🎯 피드백 효율성, 맞춤 학습</div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col gap-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative">
+                            <button class="vote-button absolute top-4 right-4 flex items-center gap-1.5 text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full bg-slate-100/80" data-subject="math" data-card-id="4">
+                                <span class="heart-outline text-lg">♡</span>
+                                <span class="heart-solid text-red-500 text-lg">♥</span>
+                                <span class="vote-count font-bold text-sm">0</span>
+                            </button>
+                            <h3 class="font-bold text-lg text-navy-800 pr-12"><span class="text-orange-500">4.</span> 수준별 협력 학습 그룹 구성 지원</h3>
+                            <div class="bg-slate-100 p-3 rounded-lg text-sm"><strong class="text-sky-700">[AIDT]</strong> Analyze, Design: AI가 학습 데이터 분석 후 효과적인 협력 학습 그룹 추천.</div>
+                            <div class="text-sm font-semibold text-slate-600 mt-auto pt-2 border-t border-slate-200">🎯 인간 존엄성, 교사 업무 효율화</div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col gap-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative">
+                            <button class="vote-button absolute top-4 right-4 flex items-center gap-1.5 text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full bg-slate-100/80" data-subject="math" data-card-id="5">
+                                <span class="heart-outline text-lg">♡</span>
+                                <span class="heart-solid text-red-500 text-lg">♥</span>
+                                <span class="vote-count font-bold text-sm">0</span>
+                            </button>
+                            <h3 class="font-bold text-lg text-navy-800 pr-12"><span class="text-orange-500">5.</span> 개념 시각화를 위한 인터랙티브 자료 제공</h3>
+                            <div class="bg-slate-100 p-3 rounded-lg text-sm"><strong class="text-sky-700">[AIDT]</strong> Implement: 3D 모델, 시뮬레이션 등 AI 시각 자료로 직관적 이해 지원.</div>
+                            <div class="text-sm font-semibold text-slate-600 mt-auto pt-2 border-t border-slate-200">🎯 맞춤 학습, 학습 흥미 유발</div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col gap-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative">
+                            <button class="vote-button absolute top-4 right-4 flex items-center gap-1.5 text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full bg-slate-100/80" data-subject="math" data-card-id="6">
+                                <span class="heart-outline text-lg">♡</span>
+                                <span class="heart-solid text-red-500 text-lg">♥</span>
+                                <span class="vote-count font-bold text-sm">0</span>
+                            </button>
+                            <h3 class="font-bold text-lg text-navy-800 pr-12"><span class="text-orange-500">6.</span> AI 튜터 기반 개별 지도</h3>
+                            <div class="bg-slate-100 p-3 rounded-lg text-sm"><strong class="text-sky-700">[AIDT]</strong> Implement: 학생이 막히는 지점을 AI가 파악하여 단계별 힌트/설명 제공.</div>
+                            <div class="text-sm font-semibold text-slate-600 mt-auto pt-2 border-t border-slate-200">🎯 맞춤 학습, 교사 전문성 강화</div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col gap-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative">
+                            <button class="vote-button absolute top-4 right-4 flex items-center gap-1.5 text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full bg-slate-100/80" data-subject="math" data-card-id="7">
+                                <span class="heart-outline text-lg">♡</span>
+                                <span class="heart-solid text-red-500 text-lg">♥</span>
+                                <span class="vote-count font-bold text-sm">0</span>
+                            </button>
+                            <h3 class="font-bold text-lg text-navy-800 pr-12"><span class="text-orange-500">7.</span> 수학 게임 기반 학습</h3>
+                            <div class="bg-slate-100 p-3 rounded-lg text-sm"><strong class="text-sky-700">[AIDT]</strong> Implement: 학생 수준에 맞춰 난이도가 조절되는 AI 수학 게임으로 흥미 유발.</div>
+                            <div class="text-sm font-semibold text-slate-600 mt-auto pt-2 border-t border-slate-200">🎯 학생 참여 증진, 맞춤 학습</div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col gap-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative">
+                            <button class="vote-button absolute top-4 right-4 flex items-center gap-1.5 text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full bg-slate-100/80" data-subject="math" data-card-id="8">
+                                <span class="heart-outline text-lg">♡</span>
+                                <span class="heart-solid text-red-500 text-lg">♥</span>
+                                <span class="vote-count font-bold text-sm">0</span>
+                            </button>
+                            <h3 class="font-bold text-lg text-navy-800 pr-12"><span class="text-orange-500">8.</span> 수학 학습 과정 추적 및 성장 기록</h3>
+                            <div class="bg-slate-100 p-3 rounded-lg text-sm"><strong class="text-sky-700">[AIDT]</strong> Track, Evaluate: 학습 과정, 성취도 변화를 AI가 추적/기록하여 포트폴리오화.</div>
+                            <div class="text-sm font-semibold text-slate-600 mt-auto pt-2 border-t border-slate-200">🎯 맞춤 학습, 교사 전문성 강화</div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col gap-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative">
+                            <button class="vote-button absolute top-4 right-4 flex items-center gap-1.5 text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full bg-slate-100/80" data-subject="math" data-card-id="9">
+                                <span class="heart-outline text-lg">♡</span>
+                                <span class="heart-solid text-red-500 text-lg">♥</span>
+                                <span class="vote-count font-bold text-sm">0</span>
+                            </button>
+                            <h3 class="font-bold text-lg text-navy-800 pr-12"><span class="text-orange-500">9.</span> 자동 채점 및 즉각적인 형성평가</h3>
+                            <div class="bg-slate-100 p-3 rounded-lg text-sm"><strong class="text-sky-700">[AIDT]</strong> Evaluate: AI 자동 채점으로 교사 업무 경감 및 학생에게 즉각적 피드백.</div>
+                            <div class="text-sm font-semibold text-slate-600 mt-auto pt-2 border-t border-slate-200">🎯 피드백 효율성, 교사 업무 효율화</div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col gap-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative">
+                            <button class="vote-button absolute top-4 right-4 flex items-center gap-1.5 text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full bg-slate-100/80" data-subject="math" data-card-id="10">
+                                <span class="heart-outline text-lg">♡</span>
+                                <span class="heart-solid text-red-500 text-lg">♥</span>
+                                <span class="vote-count font-bold text-sm">0</span>
+                            </button>
+                            <h3 class="font-bold text-lg text-navy-800 pr-12"><span class="text-orange-500">10.</span> 자기 주도적 학습 계획 및 실행 지원</h3>
+                            <div class="bg-slate-100 p-3 rounded-lg text-sm"><strong class="text-sky-700">[AIDT]</strong> Design, Implement, Track: AI가 학습 계획 수립, 진도 관리, 목표 달성 추적 지원.</div>
+                            <div class="text-sm font-semibold text-slate-600 mt-auto pt-2 border-t border-slate-200">🎯 인간 존엄성, 맞춤 학습</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-slate-800 text-slate-300 mt-16 md:mt-24">
+        <div class="container mx-auto px-6 py-8 text-center">
+            <p>&copy; 2025 교육 콘텐츠 시각화 전문가. All Rights Reserved.</p>
+            <p class="text-sm mt-2 text-slate-400">본 페이지는 교육적 목적으로 제작되었습니다.</p>
+        </div>
+    </footer>
+    
+    <!-- Firebase 설정 스크립트 -->
+    <script src="firebase-config.js"></script>
+    
+    <script>
+        // 전역 변수
+        let voteManager;
+        let currentVotes = { english: {}, math: {} };
+        let userVotes = new Set(); // 사용자가 투표한 카드들 추적
+
+        // Firebase 초기화 및 투표 관리자 생성
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                // Firebase 설정을 여기서 업데이트하세요
+                const firebaseConfig = {
+                    apiKey: "AIzaSyB299UKgk2jsgurWvzpa4_06TBUVYGzXvg",
+                    authDomain: "feeltwo250709.firebaseapp.com",
+                    databaseURL: "https://feeltwo250709-default-rtdb.asia-southeast1.firebasedatabase.app",
+                    projectId: "feeltwo250709",
+                    storageBucket: "feeltwo250709.firebasestorage.app",
+                    messagingSenderId: "342540277229",
+                    appId: "1:342540277229:web:21c6701e4e14d5dba283e4",
+                    measurementId: "G-6X06LLRWWY"
+                };
+
+                // Firebase 초기화
+                firebase.initializeApp(firebaseConfig);
+                
+                // 투표 관리자 생성
+                voteManager = new VoteManager();
+                
+                // 연결 상태 업데이트
+                updateConnectionStatus(true);
+                
+                // 초기 투표 데이터 로드
+                await loadInitialVotes();
+                
+                // 실시간 투표 변경 감지
+                voteManager.onVotesChange((votes) => {
+                    currentVotes = votes;
+                    updateAllVoteCounts();
+                });
+                
+                console.log('Firebase 연결 성공');
+            } catch (error) {
+                console.error('Firebase 연결 실패:', error);
+                updateConnectionStatus(false);
+            }
+        });
+
+        // 초기 투표 데이터 로드
+        async function loadInitialVotes() {
+            try {
+                currentVotes = await voteManager.getAllVotes();
+                updateAllVoteCounts();
+            } catch (error) {
+                console.error('초기 투표 데이터 로드 실패:', error);
+            }
+        }
+
+        // 모든 투표 수 업데이트
+        function updateAllVoteCounts() {
+            document.querySelectorAll('.vote-button').forEach(button => {
+                const subject = button.dataset.subject;
+                const cardId = button.dataset.cardId;
+                const countSpan = button.querySelector('.vote-count');
+                
+                const count = currentVotes[subject]?.[cardId] || 0;
+                countSpan.textContent = count;
+                
+                // 사용자가 투표한 카드인지 확인
+                const voteKey = `${subject}_${cardId}`;
+                if (userVotes.has(voteKey)) {
+                    button.classList.add('voted', 'text-red-500');
+                    button.classList.remove('text-slate-400');
+                }
+            });
+        }
+
+        // 연결 상태 업데이트
+        function updateConnectionStatus(connected) {
+            const statusElement = document.getElementById('connectionStatus');
+            if (connected) {
+                statusElement.textContent = '🟢 실시간 연결됨';
+                statusElement.className = 'connection-status connected';
+            } else {
+                statusElement.textContent = '🔴 연결 실패';
+                statusElement.className = 'connection-status disconnected';
+            }
+        }
+
+        // 모바일 메뉴 토글
+        document.getElementById('mobile-menu-button').addEventListener('click', () => {
+            document.getElementById('mobile-menu').classList.toggle('hidden');
+        });
+
+        // 탭 기능
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabPanels = document.querySelectorAll('.tab-panel');
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const targetTab = button.dataset.tab;
+
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+
+                tabPanels.forEach(panel => {
+                    if (panel.id === `${targetTab}-panel`) {
+                        panel.classList.remove('hidden');
+                    } else {
+                        panel.classList.add('hidden');
+                    }
+                });
+            });
+        });
+
+        // 공감 투표 기능
+        document.querySelectorAll('.vote-button').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                
+                if (!voteManager) {
+                    alert('Firebase 연결이 필요합니다.');
+                    return;
+                }
+                
+                const subject = button.dataset.subject;
+                const cardId = button.dataset.cardId;
+                const voteKey = `${subject}_${cardId}`;
+                
+                try {
+                    if (userVotes.has(voteKey)) {
+                        // 투표 취소
+                        await voteManager.removeVote(subject, cardId);
+                        userVotes.delete(voteKey);
+                        button.classList.remove('voted', 'text-red-500');
+                        button.classList.add('text-slate-400');
+                    } else {
+                        // 투표 추가
+                        await voteManager.addVote(subject, cardId);
+                        userVotes.add(voteKey);
+                        button.classList.add('voted', 'text-red-500');
+                        button.classList.remove('text-slate-400');
+                    }
+                } catch (error) {
+                    console.error('투표 처리 실패:', error);
+                    alert('투표 처리 중 오류가 발생했습니다.');
+                }
+            });
+        });
+
+        // 관리자 패널 토글 (Ctrl + A)
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'a') {
+                e.preventDefault();
+                const adminPanel = document.getElementById('adminPanel');
+                adminPanel.classList.toggle('hidden');
+            }
+        });
+
+        // 투표 초기화 기능
+        document.getElementById('resetVotesBtn').addEventListener('click', async () => {
+            const password = document.getElementById('adminPassword').value;
+            const messageElement = document.getElementById('adminMessage');
+            
+            if (!voteManager) {
+                messageElement.textContent = 'Firebase 연결이 필요합니다.';
+                messageElement.className = 'text-xs mt-1 text-red-500';
+                return;
+            }
+            
+            try {
+                await voteManager.resetVotes(password);
+                messageElement.textContent = '투표가 성공적으로 초기화되었습니다.';
+                messageElement.className = 'text-xs mt-1 text-green-500';
+                userVotes.clear(); // 사용자 투표 기록도 초기화
+                
+                // 3초 후 메시지 숨기기
+                setTimeout(() => {
+                    messageElement.textContent = '';
+                }, 3000);
+            } catch (error) {
+                messageElement.textContent = error.message;
+                messageElement.className = 'text-xs mt-1 text-red-500';
+            }
+        });
+
+        // 스크롤에 따른 활성 네비게이션 링크 표시
+        const sections = document.querySelectorAll('section[id]');
+        const navLinks = document.querySelectorAll('.nav-link');
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                if (pageYOffset >= section.offsetTop - 150) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href').substring(1) === current) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html> 
