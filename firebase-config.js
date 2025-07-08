@@ -19,7 +19,7 @@ const db = firebase.firestore();
 class VoteManager {
   constructor() {
     this.votesRef = db.collection('votes');
-    this.adminPassword = 'admin1234';
+    this.adminPassword = '250709';
   }
 
   // 투표 추가
